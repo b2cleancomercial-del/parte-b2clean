@@ -230,26 +230,39 @@ $("form").addEventListener("submit", async function(e){
   if (!f){ aviso("Falta la fecha.", false); return; }
   if (!s){ aviso("Falta escoger el servicio.", false); return; }
   if ($("lavados").value === ""){ aviso("Escribe cuántos paneles lavaron (0 si no se lavó).", false); return; }
-  if (typeof XLSX === "undefined"){ aviso("No hay internet para generar el archivo. Busca señal y vuelve a darle Enviar (lo que escribiste no se borra).", false); return; }
   var id = slug(g) + "_" + f + "_" + slug(s.codigo || s.nombre);
   var H = ["ID","Fecha","Grupo","Código servicio","Cliente","Proyecto","Ciudad","Hora llegada","Hora inicio","Hora fin","Paneles lavados","Paneles rotos","Agua m3","ACPM gl","Gasolina gl","Novedades"];
-  var fila = [id, serial(f), g, s.codigo, s.cliente, s.proyecto, s.ciudad, $("llegada").value, $("inicio").value, $("fin").value,
+  var fila = [id, f, g, s.codigo, s.cliente, s.proyecto, s.ciudad, $("llegada").value, $("inicio").value, $("fin").value,
               num($("lavados").value), num($("rotos").value), num($("agua").value), num($("acpm").value), num($("gasolina").value), $("novedades").value.trim()];
-  var ws = XLSX.utils.aoa_to_sheet([H, fila]); ws["B2"].z = "dd/mm/yyyy";
+  var nombre = "Parte " + g + " " + f;
+
+  // Celular: se comparte como .csv (Chrome en Android no deja compartir .xlsx, pero .csv sí, y WhatsApp lo recibe).
+  function celda(v){
+    if (typeof v === "number") v = String(v).replace(".", ",");
+    v = String(v == null ? "" : v).replace(/\r?\n/g, " ");
+    return /[";]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  }
+  var csv = "﻿" + [H, fila].map(function(r){ return r.map(celda).join(";"); }).join("\r\n") + "\r\n";
+  var archivo = null;
+  try{ archivo = new File([csv], nombre + ".csv", {type:"text/csv"}); }catch(err){}
+  if (archivo && navigator.canShare && navigator.canShare({files:[archivo]})){
+    try{
+      await navigator.share({files:[archivo], title:nombre, text:"Parte diario " + g + " " + f});
+      aviso("Listo. Si lo mandaste a la oficina por WhatsApp, ya quedó.", true); return;
+    }catch(err){ if (err && err.name === "AbortError"){ aviso("No se envió. Dale otra vez a Enviar parte y escoge WhatsApp.", false); return; } }
+  }
+
+  // Computador (o celular sin opción de compartir): se descarga el Excel.
+  if (typeof XLSX === "undefined"){ aviso("No hay internet para generar el archivo. Busca señal y vuelve a darle Enviar (lo que escribiste no se borra).", false); return; }
+  var filaX = fila.slice(); filaX[1] = serial(f);
+  var ws = XLSX.utils.aoa_to_sheet([H, filaX]); ws["B2"].z = "dd/mm/yyyy";
   ws["!cols"] = H.map(function(h){ return {wch: Math.max(10, h.length + 2)}; });
   var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Parte");
   var buf = XLSX.write(wb, {bookType:"xlsx", type:"array"});
-  var nombre = "Parte " + g + " " + f + ".xlsx";
-  var file = null;
-  try{ file = new File([buf], nombre, {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}); }catch(err){}
-  if (file && navigator.canShare && navigator.canShare({files:[file]})){
-    try{ await navigator.share({files:[file], title:nombre, text:"Parte diario " + g + " " + f}); aviso("Listo. Si lo mandaste a la oficina por WhatsApp, ya quedó.", true); return; }
-    catch(err){ if (err && err.name === "AbortError") { aviso("No se envió. Dale otra vez a Enviar parte cuando quieras.", false); return; } }
-  }
   var a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([buf], {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
-  a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
-  aviso("Se descargó el archivo \"" + nombre + "\". Envíalo a la oficina por WhatsApp (adjuntar → Documento).", true);
+  a.download = nombre + ".xlsx"; document.body.appendChild(a); a.click(); a.remove();
+  aviso("Se descargó el archivo \"" + nombre + ".xlsx\". Envíalo a la oficina por WhatsApp (adjuntar → Documento).", true);
 });
 })();
 </script>
