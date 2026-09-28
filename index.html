@@ -92,6 +92,7 @@
 
     <button class="btn" type="submit">Enviar parte</button>
     <div class="msg" id="msg" hidden></div>
+    <div class="foot" id="otraOpcion" hidden><a href="#" id="btnWhats" style="color:inherit">Otra opción: enviar por WhatsApp</a></div>
   </form>
 
   <div class="foot" id="foot"></div>
@@ -105,6 +106,9 @@ var SERVICIOS = [];
 var GENERADO = "";
 var KEY_LISTA = "b2clean_parte_web_lista";
 var KEY_CLAVE = "b2clean_parte_web_clave";
+var KEY_COLA = "b2clean_parte_web_pendientes";
+var FORM = null;   // envio directo (formulario de Google); null = solo WhatsApp
+var CLAVE_ACTUAL = "", porWhats = false;
 var GRUPOS = ["Grupo 1","Grupo 2","Grupo 3","Grupo 4","Grupo 5","Grupo 6","Grupo 7"];
 var KEY = "b2clean_parte_celular_grupo";
 
@@ -169,6 +173,9 @@ var ENC = null, SIN_SENAL = false;
 async function abrir(clave){
   var d = await descifrar(ENC, clave);
   guardarLS(KEY_CLAVE, clave);
+  CLAVE_ACTUAL = clave.trim().toLowerCase();
+  $("otraOpcion").hidden = !FORM;
+  setTimeout(function(){ vaciarCola().then(function(r){ if (r.enviados) aviso("✓ Se enviaron " + r.enviados + " parte(s) que estaban guardados en el celular.", true); }); }, 500);
   $("login").hidden = true; $("cargando").hidden = true; $("form").hidden = false; $("salir").hidden = false;
   var sel = $("grupo");
   if (d.grupo){
@@ -220,6 +227,37 @@ else fetch("servicios.json?t=" + Date.now(), {cache:"no-store"})
     else $("cargando").textContent = "Sin señal: no se pudo cargar la lista de servicios. Busca señal y recarga la página.";
   });
 
+function aB64(buf){ var u = new Uint8Array(buf), t = ""; for (var i = 0; i < u.length; i++) t += String.fromCharCode(u[i]); return btoa(t); }
+async function cifrarParte(obj){
+  // Solo el computador de la oficina (llave privada) puede abrir lo que se envia.
+  var pub = await crypto.subtle.importKey("spki", b64(FORM.pub), {name:"RSA-OAEP", hash:"SHA-256"}, false, ["encrypt"]);
+  var k = await crypto.subtle.generateKey({name:"AES-GCM", length:256}, true, ["encrypt"]);
+  var wk = await crypto.subtle.encrypt({name:"RSA-OAEP"}, pub, await crypto.subtle.exportKey("raw", k));
+  var iv = crypto.getRandomValues(new Uint8Array(12));
+  var ct = await crypto.subtle.encrypt({name:"AES-GCM", iv:iv}, k, new TextEncoder().encode(JSON.stringify(obj)));
+  return ["b2c1", aB64(wk), aB64(iv), aB64(ct)].join(".");
+}
+function leerCola(){ try{ return JSON.parse(leerLS(KEY_COLA)) || []; }catch(e){ return []; } }
+var vaciando = null;
+function vaciarCola(){
+  if (!FORM) return Promise.resolve({enviados:0, quedan:0});
+  if (vaciando) return vaciando;
+  var tarea = (async function(){
+    var cola = leerCola(), enviados = 0;
+    while (cola.length){
+      var body = new URLSearchParams(); body.append(FORM.entry, cola[0]);
+      try{ await fetch(FORM.url, {method:"POST", mode:"no-cors", body:body}); }catch(e){ break; }
+      cola.shift(); enviados++; guardarLS(KEY_COLA, JSON.stringify(cola));
+    }
+    return {enviados:enviados, quedan:cola.length};
+  })();
+  vaciando = tarea;
+  tarea.then(function(){ vaciando = null; }, function(){ vaciando = null; });
+  return tarea;
+}
+window.addEventListener("online", function(){ vaciarCola().then(function(r){ if (r.enviados) aviso("✓ Volvió la señal: se enviaron " + r.enviados + " parte(s) guardados.", true); }); });
+$("btnWhats").addEventListener("click", function(e){ e.preventDefault(); porWhats = true; $("form").requestSubmit(); });
+
 function aviso(t, ok){ var m = $("msg"); m.hidden = false; m.textContent = t; m.className = "msg " + (ok ? "ok" : "err"); m.scrollIntoView({behavior:"smooth", block:"center"}); }
 function serial(f){ var p = f.split("-"); return (Date.UTC(+p[0], +p[1]-1, +p[2]) - Date.UTC(1899, 11, 30)) / 86400000; }
 
@@ -235,6 +273,22 @@ $("form").addEventListener("submit", async function(e){
   var fila = [id, f, g, s.codigo, s.cliente, s.proyecto, s.ciudad, $("llegada").value, $("inicio").value, $("fin").value,
               num($("lavados").value), num($("rotos").value), num($("agua").value), num($("acpm").value), num($("gasolina").value), $("novedades").value.trim()];
   var nombre = "Parte " + g + " " + f;
+
+  if (FORM && !porWhats){
+    var p = {v:1, clave:CLAVE_ACTUAL, id:id, fecha:f, grupo:g, codigo:s.codigo, cliente:s.cliente, proyecto:s.proyecto, ciudad:s.ciudad,
+             llegada:$("llegada").value, inicio:$("inicio").value, fin:$("fin").value,
+             lavados:num($("lavados").value), rotos:num($("rotos").value), agua:num($("agua").value), acpm:num($("acpm").value),
+             gasolina:num($("gasolina").value), novedades:$("novedades").value.trim(), enviado:new Date().toISOString()};
+    var dato;
+    try{ dato = await cifrarParte(p); }
+    catch(err){ aviso("Este celular no pudo preparar el parte. Usa 'Otra opción: enviar por WhatsApp'.", false); return; }
+    var cola = leerCola(); cola.push(dato); guardarLS(KEY_COLA, JSON.stringify(cola));
+    var r = await vaciarCola();
+    if (!r.quedan) aviso("✓ Parte enviado a la oficina. Si corriges algo, vuelve a enviarlo: reemplaza el anterior.", true);
+    else aviso("Sin señal: el parte quedó guardado en el celular y se envía solo cuando vuelva el internet (deja esta página abierta o ábrela de nuevo con señal).", true);
+    return;
+  }
+  porWhats = false;
 
   // Celular: se comparte como .csv (Chrome en Android no deja compartir .xlsx, pero .csv sí, y WhatsApp lo recibe).
   function celda(v){
