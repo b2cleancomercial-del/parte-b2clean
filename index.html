@@ -95,6 +95,7 @@
   </form>
 
   <div class="foot" id="foot"></div>
+  <div class="foot" id="salir" hidden><a href="#" id="btnSalir" style="color:inherit">Cambiar de clave</a></div>
 </div>
 
 <script>
@@ -151,10 +152,16 @@ $("servicio").addEventListener("change", mostrarInfo);
 
 function b64(s){ var b = atob(s), u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
 async function descifrar(enc, clave){
+  // Cada grupo tiene su bloque cifrado con su clave: se prueba la clave en todos y se abre el que corresponda.
   var base = await crypto.subtle.importKey("raw", new TextEncoder().encode(clave.trim().toLowerCase()), "PBKDF2", false, ["deriveKey"]);
   var k = await crypto.subtle.deriveKey({name:"PBKDF2", salt:b64(enc.salt), iterations:enc.it, hash:"SHA-256"}, base, {name:"AES-GCM", length:256}, false, ["decrypt"]);
-  var plano = await crypto.subtle.decrypt({name:"AES-GCM", iv:b64(enc.iv)}, k, b64(enc.data));
-  return JSON.parse(new TextDecoder().decode(plano));
+  for (var i = 0; i < enc.items.length; i++){
+    try{
+      var plano = await crypto.subtle.decrypt({name:"AES-GCM", iv:b64(enc.items[i].iv)}, k, b64(enc.items[i].data));
+      return JSON.parse(new TextDecoder().decode(plano));
+    }catch(e){}
+  }
+  throw new Error("clave");
 }
 function leerLS(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
 function guardarLS(k, v){ try{ localStorage.setItem(k, v); }catch(e){} }
@@ -162,13 +169,27 @@ var ENC = null, SIN_SENAL = false;
 async function abrir(clave){
   var d = await descifrar(ENC, clave);
   guardarLS(KEY_CLAVE, clave);
-  $("login").hidden = true; $("cargando").hidden = true; $("form").hidden = false;
+  $("login").hidden = true; $("cargando").hidden = true; $("form").hidden = false; $("salir").hidden = false;
+  var sel = $("grupo");
+  if (d.grupo){
+    sel.innerHTML = "<option>" + esc(d.grupo) + "</option>"; sel.value = d.grupo; sel.disabled = true;
+  } else {
+    sel.disabled = false;
+    sel.innerHTML = '<option value="">Escoge el grupo…</option>' + GRUPOS.map(function(g){ return "<option>" + g + "</option>"; }).join("");
+    var g0 = leerLS(KEY); if (g0) sel.value = g0;
+  }
   usarLista(d, SIN_SENAL);
 }
 function pedirClave(t){
   $("cargando").hidden = true; $("form").hidden = true; $("login").hidden = false;
   if (t){ var m = $("msgLogin"); m.hidden = false; m.textContent = t; m.className = "msg err"; }
 }
+$("btnSalir").addEventListener("click", function(e){
+  e.preventDefault();
+  if (!confirm("¿Borrar la clave de este celular? Tendrás que escribirla de nuevo.")) return;
+  try{ localStorage.removeItem(KEY_CLAVE); }catch(err){}
+  $("clave").value = ""; $("msgLogin").hidden = true; $("salir").hidden = true; pedirClave("");
+});
 $("login").addEventListener("submit", function(e){
   e.preventDefault();
   var c = $("clave").value;
