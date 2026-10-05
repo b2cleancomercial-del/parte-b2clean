@@ -42,6 +42,11 @@
   .msg{ font-size:15px; font-weight:600; border-radius:10px; padding:10px 12px; }
   .msg.ok{ background:var(--good-soft); color:var(--good); }
   .msg.err{ background:var(--bad-soft); color:var(--bad); }
+  .chips{ display:flex; flex-wrap:wrap; gap:8px; }
+  .chip{ display:inline-flex; align-items:center; gap:7px; background:var(--kraft); border:1px solid var(--line); border-radius:999px; padding:8px 13px; font-size:15px; cursor:pointer; user-select:none; text-transform:none; letter-spacing:0; color:var(--ink); font-weight:500; margin:0; }
+  .chip input{ width:18px; height:18px; margin:0; padding:0; accent-color:var(--accent); }
+  .chip:has(input:checked){ background:var(--accent-soft); border-color:var(--accent); font-weight:700; }
+  details.otros summary{ cursor:pointer; color:var(--accent); font-size:14px; font-weight:700; margin:10px 0 6px; }
   .foot{ font-size:12px; color:var(--ink-soft); text-align:center; }
   [hidden]{ display:none !important; }
 </style>
@@ -75,6 +80,11 @@
       <select id="servicio"></select>
     </div>
     <div class="serv" id="servInfo" hidden></div>
+    <div id="wrapEquipo" hidden>
+      <label>¿Quiénes trabajaron hoy? <span class="req">*</span></label>
+      <div class="chips" id="equipo"></div>
+      <details class="otros"><summary>Otro personal B2Clean</summary><div class="chips" id="otros"></div></details>
+    </div>
 
     <div class="sec">Horas</div>
     <div class="row3">
@@ -110,6 +120,7 @@
 (function(){
 "use strict";
 var SERVICIOS = [];
+var PERSONAL = [];
 var GENERADO = "";
 var KEY_LISTA = "b2clean_parte_web_lista";
 var KEY_CLAVE = "b2clean_parte_web_clave";
@@ -132,6 +143,18 @@ $("grupo").innerHTML = '<option value="">Escoge tu grupo…</option>' + GRUPOS.m
 $("fecha").value = hoy();
 try{ var g0 = localStorage.getItem(KEY); if (g0) $("grupo").value = g0; }catch(e){}
 
+var KEY_EQ = "b2clean_parte_equipo_";
+function marcados(){ return [].map.call(document.querySelectorAll("#wrapEquipo input:checked"), function(x){ return x.value; }); }
+function llenarEquipo(){
+  var g = $("grupo").value, ahora = marcados(), ult = [];
+  try{ ult = JSON.parse(localStorage.getItem(KEY_EQ + g) || "[]"); }catch(e){}
+  var sel = ahora.length ? ahora : ult;
+  function chip(p){ return '<label class="chip"><input type="checkbox" value="' + esc(p[0]) + '"' + (sel.indexOf(p[0]) >= 0 ? " checked" : "") + ">" + esc(p[0]) + "</label>"; }
+  var del = PERSONAL.filter(function(p){ return p[1] === g; }), otros = PERSONAL.filter(function(p){ return p[1] !== g; });
+  $("equipo").innerHTML = del.length ? del.map(chip).join("") : '<span class="sub">Busca a las personas en "Otro personal B2Clean".</span>';
+  $("otros").innerHTML = otros.map(chip).join("");
+  $("wrapEquipo").hidden = !PERSONAL.length || !g;
+}
 function llenarServicios(){
   var g = $("grupo").value, f = $("fecha").value || hoy(), sel = $("servicio"), prev = sel.value;
   if (!g){ sel.innerHTML = '<option value="">Primero escoge el grupo</option>'; mostrarInfo(); return; }
@@ -147,6 +170,7 @@ function llenarServicios(){
   if ([].some.call(sel.options, function(o){ return o.value === prev && prev !== ""; })) sel.value = prev;
   else if (curso.length === 1) sel.value = String(SERVICIOS.indexOf(curso[0]));
   mostrarInfo();
+  llenarEquipo();
 }
 function mostrarInfo(){
   var s = SERVICIOS[$("servicio").value], box = $("servInfo");
@@ -219,7 +243,7 @@ async function iniciar(enc){
 }
 
 function usarLista(d, guardada){
-  SERVICIOS = d.servicios || []; GENERADO = d.generado || "";
+  SERVICIOS = d.servicios || []; GENERADO = d.generado || ""; PERSONAL = d.personal || [];
   $("foot").textContent = "Lista de servicios del Panel de Control al " + GENERADO + (guardada ? " (sin señal: última lista guardada)." : ".");
   llenarServicios();
 }
@@ -275,17 +299,20 @@ $("form").addEventListener("submit", async function(e){
   if (!f){ aviso("Falta la fecha.", false); return; }
   if (!s){ aviso("Falta escoger el servicio.", false); return; }
   if ($("lavados").value === ""){ aviso("Escribe cuántos paneles lavaron (0 si no se lavó).", false); return; }
+  var equipo = marcados();
+  if (PERSONAL.length && !equipo.length){ aviso("Marca quiénes trabajaron hoy.", false); return; }
+  try{ localStorage.setItem(KEY_EQ + g, JSON.stringify(equipo)); }catch(e){}
   var id = slug(g) + "_" + f + "_" + slug(s.codigo || s.nombre);
-  var H = ["ID","Fecha","Grupo","Código servicio","Cliente","Proyecto","Ciudad","Hora llegada","Hora inicio","Hora fin","Paneles lavados","Paneles rotos","Agua m3","ACPM gl","Gasolina gl","Novedades"];
+  var H = ["ID","Fecha","Grupo","Código servicio","Cliente","Proyecto","Ciudad","Hora llegada","Hora inicio","Hora fin","Paneles lavados","Paneles rotos","Agua m3","ACPM gl","Gasolina gl","Novedades","Integrantes"];
   var fila = [id, f, g, s.codigo, s.cliente, s.proyecto, s.ciudad, $("llegada").value, $("inicio").value, $("fin").value,
-              num($("lavados").value), num($("rotos").value), num($("agua").value), num($("acpm").value), num($("gasolina").value), $("novedades").value.trim()];
+              num($("lavados").value), num($("rotos").value), num($("agua").value), num($("acpm").value), num($("gasolina").value), $("novedades").value.trim(), equipo.join(", ")];
   var nombre = "Parte " + g + " " + f;
 
   if (FORM && !porWhats){
     var p = {v:1, clave:CLAVE_ACTUAL, id:id, fecha:f, grupo:g, codigo:s.codigo, cliente:s.cliente, proyecto:s.proyecto, ciudad:s.ciudad,
              llegada:$("llegada").value, inicio:$("inicio").value, fin:$("fin").value,
              lavados:num($("lavados").value), rotos:num($("rotos").value), agua:num($("agua").value), acpm:num($("acpm").value),
-             gasolina:num($("gasolina").value), novedades:$("novedades").value.trim(), enviado:new Date().toISOString()};
+             gasolina:num($("gasolina").value), novedades:$("novedades").value.trim(), integrantes:equipo.join(", "), enviado:new Date().toISOString()};
     var dato;
     try{ dato = await cifrarParte(p); }
     catch(err){ aviso("Este celular no pudo preparar el parte. Usa 'Otra opción: enviar por WhatsApp'.", false); return; }
