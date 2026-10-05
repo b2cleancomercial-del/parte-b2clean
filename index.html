@@ -81,9 +81,9 @@
     </div>
     <div class="serv" id="servInfo" hidden></div>
     <div id="wrapEquipo" hidden>
-      <label>¿Quiénes trabajaron hoy? <span class="req">*</span></label>
+      <label>¿Quiénes trabajaron hoy en este servicio? <span class="req">*</span></label>
+      <div class="sub" style="margin:-2px 0 8px">Marca a todas las personas que estuvieron en el servicio.</div>
       <div class="chips" id="equipo"></div>
-      <details class="otros"><summary>Otro personal B2Clean</summary><div class="chips" id="otros"></div></details>
     </div>
 
     <div class="sec">Horas</div>
@@ -150,9 +150,8 @@ function llenarEquipo(){
   try{ ult = JSON.parse(localStorage.getItem(KEY_EQ + g) || "[]"); }catch(e){}
   var sel = ahora.length ? ahora : ult;
   function chip(p){ return '<label class="chip"><input type="checkbox" value="' + esc(p[0]) + '"' + (sel.indexOf(p[0]) >= 0 ? " checked" : "") + ">" + esc(p[0]) + "</label>"; }
-  var del = PERSONAL.filter(function(p){ return p[1] === g; }), otros = PERSONAL.filter(function(p){ return p[1] !== g; });
-  $("equipo").innerHTML = del.length ? del.map(chip).join("") : '<span class="sub">Busca a las personas en "Otro personal B2Clean".</span>';
-  $("otros").innerHTML = otros.map(chip).join("");
+  var todos = PERSONAL.slice().sort(function(a, b){ return a[0].localeCompare(b[0], "es"); });   // todo el personal B2Clean
+  $("equipo").innerHTML = todos.map(chip).join("");
   $("wrapEquipo").hidden = !PERSONAL.length || !g;
 }
 function llenarServicios(){
@@ -300,7 +299,7 @@ $("form").addEventListener("submit", async function(e){
   if (!s){ aviso("Falta escoger el servicio.", false); return; }
   if ($("lavados").value === ""){ aviso("Escribe cuántos paneles lavaron (0 si no se lavó).", false); return; }
   var equipo = marcados();
-  if (PERSONAL.length && !equipo.length){ aviso("Marca quiénes trabajaron hoy.", false); return; }
+  if (PERSONAL.length && !equipo.length){ aviso("Marca quiénes trabajaron hoy en este servicio.", false); return; }
   try{ localStorage.setItem(KEY_EQ + g, JSON.stringify(equipo)); }catch(e){}
   var id = slug(g) + "_" + f + "_" + slug(s.codigo || s.nombre);
   var H = ["ID","Fecha","Grupo","Código servicio","Cliente","Proyecto","Ciudad","Hora llegada","Hora inicio","Hora fin","Paneles lavados","Paneles rotos","Agua m3","ACPM gl","Gasolina gl","Novedades","Integrantes"];
