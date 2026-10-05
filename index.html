@@ -131,7 +131,7 @@ function llenarServicios(){
   var del = SERVICIOS.filter(function(s){ return s.grupo === g; });
   var curso = del.filter(function(s){ return addDays(s.inicio, -3) <= f && f <= addDays(s.fin || s.inicio, 3); });
   var otros = del.filter(function(s){ return curso.indexOf(s) < 0; });
-  function opt(s, i){ return '<option value="' + i + '">' + esc(s.nombre) + " (" + fTxt(s.inicio) + (s.fin && s.fin !== s.inicio ? " al " + fTxt(s.fin) : "") + ")</option>"; }
+  function opt(s, i){ return '<option value="' + i + '">' + esc((s.codigo ? s.codigo + " · " : "") + s.nombre) + " (" + fTxt(s.inicio) + (s.fin && s.fin !== s.inicio ? " al " + fTxt(s.fin) : "") + ")</option>"; }
   var html = '<option value="">Escoge el servicio…</option>';
   if (curso.length) html += '<optgroup label="En estas fechas">' + curso.map(function(s){ return opt(s, SERVICIOS.indexOf(s)); }).join("") + "</optgroup>";
   if (otros.length) html += '<optgroup label="Otros servicios del grupo">' + otros.map(function(s){ return opt(s, SERVICIOS.indexOf(s)); }).join("") + "</optgroup>";
@@ -145,7 +145,7 @@ function mostrarInfo(){
   var s = SERVICIOS[$("servicio").value], box = $("servInfo");
   if (!s){ box.hidden = true; return; }
   box.hidden = false;
-  box.innerHTML = "<b>Cliente</b><span>" + esc(s.cliente) + "</span><b>Proyecto</b><span>" + esc(s.proyecto) + "</span>" +
+  box.innerHTML = (s.codigo ? "<b>Código</b><span>" + esc(s.codigo) + "</span>" : "") + "<b>Cliente</b><span>" + esc(s.cliente) + "</span><b>Proyecto</b><span>" + esc(s.proyecto) + "</span>" +
     (s.ciudad ? "<b>Ciudad</b><span>" + esc(s.ciudad) + "</span>" : "") +
     (s.paneles ? "<b>Paneles</b><span>" + grp(s.paneles) + "</span>" : "") +
     "<b>Fechas</b><span>" + fTxt(s.inicio) + (s.fin && s.fin !== s.inicio ? " al " + fTxt(s.fin) : "") + "</span>";
