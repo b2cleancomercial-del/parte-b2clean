@@ -105,10 +105,14 @@
     </div>
 
     <div class="sec">Consumos</div>
-    <div class="row3">
-      <div><label for="agua">Agua m³</label><input type="number" id="agua" min="0" step="0.1" inputmode="decimal"></div>
-      <div><label for="acpm">ACPM gl</label><input type="number" id="acpm" min="0" step="0.1" inputmode="decimal"></div>
-      <div><label for="gasolina">Gasolina gl</label><input type="number" id="gasolina" min="0" step="0.1" inputmode="decimal"></div>
+    <div class="row2">
+      <div><label for="agua">Agua</label><input type="number" id="agua" min="0" step="any" inputmode="decimal"></div>
+      <div><label for="aguaUnidad">Unidad del agua</label><select id="aguaUnidad"><option value="m3">Metros cúbicos (m³)</option><option value="l">Litros</option></select></div>
+    </div>
+    <div class="sub" id="hintAgua"></div>
+    <div class="row2">
+      <div><label for="acpm">ACPM (galones)</label><input type="number" id="acpm" min="0" step="any" inputmode="decimal"></div>
+      <div><label for="gasolina">Gasolina (galones)</label><input type="number" id="gasolina" min="0" step="any" inputmode="decimal"></div>
     </div>
     <div><label for="novedades">Novedades</label><textarea id="novedades" placeholder="Paneles rotos, daños, clima, falta de agua…"></textarea></div>
 
@@ -138,6 +142,19 @@ var KEY = "b2clean_parte_celular_grupo";
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
 function num(v){ var n = parseFloat(v); return isFinite(n) ? n : 0; }
+// Agua: la cuadrilla la escribe en m3 o en litros; a la oficina siempre llega en m3 (1.000 litros = 1 m3).
+function aguaM3(){ var v = aguaM3(); return $("aguaUnidad").value === "l" ? +(v / 1000).toFixed(3) : v; }
+function pintarAgua(){
+  var v = aguaM3(), h = $("hintAgua");
+  if (!h) return;
+  if (!$("agua").value){ h.textContent = ""; return; }
+  h.textContent = $("aguaUnidad").value === "l"
+    ? "= " + (v / 1000).toLocaleString("es-CO", {maximumFractionDigits:3}) + " m³"
+    : "= " + (v * 1000).toLocaleString("es-CO", {maximumFractionDigits:0}) + " litros";
+}
+document.addEventListener("DOMContentLoaded", function(){
+  ["agua", "aguaUnidad"].forEach(function(i){ var el = document.getElementById(i); if (el){ el.addEventListener("input", pintarAgua); el.addEventListener("change", pintarAgua); } });
+});
 function grp(n){ return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, "."); }
 function hoy(){ var d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
 function fTxt(f){ return f ? f.slice(8,10) + "/" + f.slice(5,7) : ""; }
@@ -341,13 +358,13 @@ $("form").addEventListener("submit", async function(e){
   var id = slug(g) + "_" + f + "_" + slug(s.codigo || s.nombre);
   var H = ["ID","Fecha","Grupo","Código servicio","Cliente","Proyecto","Ciudad","Hora llegada","Hora inicio","Hora fin","Paneles lavados","Paneles rotos","Agua m3","ACPM gl","Gasolina gl","Novedades","Integrantes","Total módulos instalación"];
   var fila = [id, f, g, s.codigo, s.cliente, s.proyecto, s.ciudad, $("llegada").value, $("inicio").value, $("fin").value,
-              num($("lavados").value), num($("rotos").value), num($("agua").value), num($("acpm").value), num($("gasolina").value), $("novedades").value.trim(), equipo.join(", "), num($("acumulado").value)];
+              num($("lavados").value), num($("rotos").value), aguaM3(), num($("acpm").value), num($("gasolina").value), $("novedades").value.trim(), equipo.join(", "), num($("acumulado").value)];
   var nombre = "Parte " + g + " " + f;
 
   if (FORM && !porWhats){
     var p = {v:1, clave:CLAVE_ACTUAL, id:id, fecha:f, grupo:g, codigo:s.codigo, cliente:s.cliente, proyecto:s.proyecto, ciudad:s.ciudad,
              llegada:$("llegada").value, inicio:$("inicio").value, fin:$("fin").value,
-             lavados:num($("lavados").value), rotos:num($("rotos").value), agua:num($("agua").value), acpm:num($("acpm").value),
+             lavados:num($("lavados").value), rotos:num($("rotos").value), agua:aguaM3(), acpm:num($("acpm").value),
              gasolina:num($("gasolina").value), novedades:$("novedades").value.trim(), integrantes:equipo.join(", "), acumulado:num($("acumulado").value), enviado:new Date().toISOString()};
     var dato;
     try{ dato = await cifrarParte(p); }
