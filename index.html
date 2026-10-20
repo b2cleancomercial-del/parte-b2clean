@@ -182,9 +182,20 @@ function llenarServicios(){
   mostrarInfo();
   llenarEquipo();
 }
+var acumManual = false;
+function sugerirAcum(){
+  var s = SERVICIOS[$("servicio").value];
+  if (acumManual || !s) return;
+  var l = num($("lavados").value);
+  $("acumulado").value = (s.acum || l) ? String(Math.round((s.acum || 0) + l)) : "";
+}
+$("acumulado").addEventListener("input", function(){ acumManual = this.value !== ""; });
+$("lavados").addEventListener("input", sugerirAcum);
 function mostrarInfo(){
   var s = SERVICIOS[$("servicio").value], box = $("servInfo");
-  $("hintAcum").textContent = (s && s.paneles) ? "La instalación tiene " + grp(s.paneles) + " módulos en total (según el Panel)." : "";
+  $("hintAcum").textContent = !s ? "" : ("Lleva " + grp(s.acum || 0) + " módulos lavados en este proyecto (todos los meses, según el Panel)." +
+    (s.paneles ? " Este servicio: " + grp(s.paneles) + " módulos." : "") + " Se suma lo de hoy; corrígelo si no coincide.");
+  sugerirAcum();
   if (!s){ box.hidden = true; return; }
   box.hidden = false;
   box.innerHTML = (s.codigo ? "<b>Código</b><span>" + esc(s.codigo) + "</span>" : "") + "<b>Cliente</b><span>" + esc(s.cliente) + "</span><b>Proyecto</b><span>" + esc(s.proyecto) + "</span>" +
@@ -194,7 +205,7 @@ function mostrarInfo(){
 }
 $("grupo").addEventListener("change", function(){ try{ localStorage.setItem(KEY, this.value); }catch(e){} llenarServicios(); });
 $("fecha").addEventListener("change", llenarServicios);
-$("servicio").addEventListener("change", mostrarInfo);
+$("servicio").addEventListener("change", function(){ acumManual = false; mostrarInfo(); });
 
 function b64(s){ var b = atob(s), u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
 async function descifrar(enc, clave){
