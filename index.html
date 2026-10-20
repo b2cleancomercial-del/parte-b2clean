@@ -98,6 +98,11 @@
       <div><label for="lavados">Paneles lavados <span class="req">*</span></label><input type="number" id="lavados" min="0" step="1" inputmode="numeric"></div>
       <div><label for="rotos">Paneles rotos</label><input type="number" id="rotos" min="0" step="1" inputmode="numeric"></div>
     </div>
+    <div>
+      <label for="acumulado">Total módulos lavados de la instalación (acumulado)</label>
+      <input type="number" id="acumulado" min="0" step="1" inputmode="numeric" placeholder="Ej. 103050">
+      <div class="sub" id="hintAcum" style="margin-top:4px"></div>
+    </div>
 
     <div class="sec">Consumos</div>
     <div class="row3">
@@ -145,13 +150,19 @@ try{ var g0 = localStorage.getItem(KEY); if (g0) $("grupo").value = g0; }catch(e
 
 var KEY_EQ = "b2clean_parte_equipo_";
 function marcados(){ return [].map.call(document.querySelectorAll("#wrapEquipo input:checked"), function(x){ return x.value; }); }
+var eqGrupo = "";
 function llenarEquipo(){
-  var g = $("grupo").value, ahora = marcados(), ult = [];
+  var g = $("grupo").value, ahora = (g === eqGrupo) ? marcados() : [], ult = [];
   try{ ult = JSON.parse(localStorage.getItem(KEY_EQ + g) || "[]"); }catch(e){}
-  var sel = ahora.length ? ahora : ult;
+  var ord = function(a, b){ return a[0].localeCompare(b[0], "es"); };
+  var mios = PERSONAL.filter(function(p){ return p[1] === g; }).sort(ord);
+  var otros = PERSONAL.filter(function(p){ return p[1] !== g; }).sort(ord);
+  var sel = ahora.length ? ahora : (ult.length ? ult : mios.map(function(p){ return p[0]; }));
   function chip(p){ return '<label class="chip"><input type="checkbox" value="' + esc(p[0]) + '"' + (sel.indexOf(p[0]) >= 0 ? " checked" : "") + ">" + esc(p[0]) + "</label>"; }
-  var todos = PERSONAL.slice().sort(function(a, b){ return a[0].localeCompare(b[0], "es"); });   // todo el personal B2Clean
-  $("equipo").innerHTML = todos.map(chip).join("");
+  var tit = function(t){ return '<div class="sub" style="flex-basis:100%;margin:4px 0 0;font-weight:700">' + t + "</div>"; };
+  $("equipo").innerHTML = (mios.length ? tit("Personal de " + esc(g)) + mios.map(chip).join("") : "") +
+                          (otros.length ? tit(mios.length ? "Otro personal B2Clean" : "Personal B2Clean") + otros.map(chip).join("") : "");
+  eqGrupo = g;
   $("wrapEquipo").hidden = !PERSONAL.length || !g;
 }
 function llenarServicios(){
@@ -173,6 +184,7 @@ function llenarServicios(){
 }
 function mostrarInfo(){
   var s = SERVICIOS[$("servicio").value], box = $("servInfo");
+  $("hintAcum").textContent = (s && s.paneles) ? "La instalación tiene " + grp(s.paneles) + " módulos en total (según el Panel)." : "";
   if (!s){ box.hidden = true; return; }
   box.hidden = false;
   box.innerHTML = (s.codigo ? "<b>Código</b><span>" + esc(s.codigo) + "</span>" : "") + "<b>Cliente</b><span>" + esc(s.cliente) + "</span><b>Proyecto</b><span>" + esc(s.proyecto) + "</span>" +
@@ -317,16 +329,16 @@ $("form").addEventListener("submit", async function(e){
   if (PERSONAL.length && !equipo.length){ aviso("Marca quiénes trabajaron hoy en este servicio.", false); return; }
   try{ localStorage.setItem(KEY_EQ + g, JSON.stringify(equipo)); }catch(e){}
   var id = slug(g) + "_" + f + "_" + slug(s.codigo || s.nombre);
-  var H = ["ID","Fecha","Grupo","Código servicio","Cliente","Proyecto","Ciudad","Hora llegada","Hora inicio","Hora fin","Paneles lavados","Paneles rotos","Agua m3","ACPM gl","Gasolina gl","Novedades","Integrantes"];
+  var H = ["ID","Fecha","Grupo","Código servicio","Cliente","Proyecto","Ciudad","Hora llegada","Hora inicio","Hora fin","Paneles lavados","Paneles rotos","Agua m3","ACPM gl","Gasolina gl","Novedades","Integrantes","Total módulos instalación"];
   var fila = [id, f, g, s.codigo, s.cliente, s.proyecto, s.ciudad, $("llegada").value, $("inicio").value, $("fin").value,
-              num($("lavados").value), num($("rotos").value), num($("agua").value), num($("acpm").value), num($("gasolina").value), $("novedades").value.trim(), equipo.join(", ")];
+              num($("lavados").value), num($("rotos").value), num($("agua").value), num($("acpm").value), num($("gasolina").value), $("novedades").value.trim(), equipo.join(", "), num($("acumulado").value)];
   var nombre = "Parte " + g + " " + f;
 
   if (FORM && !porWhats){
     var p = {v:1, clave:CLAVE_ACTUAL, id:id, fecha:f, grupo:g, codigo:s.codigo, cliente:s.cliente, proyecto:s.proyecto, ciudad:s.ciudad,
              llegada:$("llegada").value, inicio:$("inicio").value, fin:$("fin").value,
              lavados:num($("lavados").value), rotos:num($("rotos").value), agua:num($("agua").value), acpm:num($("acpm").value),
-             gasolina:num($("gasolina").value), novedades:$("novedades").value.trim(), integrantes:equipo.join(", "), enviado:new Date().toISOString()};
+             gasolina:num($("gasolina").value), novedades:$("novedades").value.trim(), integrantes:equipo.join(", "), acumulado:num($("acumulado").value), enviado:new Date().toISOString()};
     var dato;
     try{ dato = await cifrarParte(p); }
     catch(err){ aviso("Este celular no pudo preparar el parte. Usa 'Otra opción: enviar por WhatsApp'.", false); return; }
