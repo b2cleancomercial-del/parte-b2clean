@@ -193,7 +193,7 @@ $("acumulado").addEventListener("input", function(){ acumManual = this.value !==
 $("lavados").addEventListener("input", sugerirAcum);
 function mostrarInfo(){
   var s = SERVICIOS[$("servicio").value], box = $("servInfo");
-  $("hintAcum").textContent = !s ? "" : ("Este servicio lleva " + grp(s.acum || 0) + (s.paneles ? " de " + grp(s.paneles) : "") + " módulos lavados (según el Panel). Se suma lo de hoy; corrígelo si no coincide.");
+  $("hintAcum").textContent = !s ? "" : ("Lleva " + grp(s.acum || 0) + " módulos lavados (este servicio y lo que está en X Facturar del mismo proyecto, según el Panel)" + (s.paneles ? "; el servicio es de " + grp(s.paneles) : "") + ". Se suma lo de hoy; corrígelo si no coincide.");
   sugerirAcum();
   if (!s){ box.hidden = true; return; }
   box.hidden = false;
