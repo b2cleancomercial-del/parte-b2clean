@@ -143,9 +143,9 @@ function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
 function num(v){ var n = parseFloat(v); return isFinite(n) ? n : 0; }
 // Agua: la cuadrilla la escribe en m3 o en litros; a la oficina siempre llega en m3 (1.000 litros = 1 m3).
-function aguaM3(){ var v = aguaM3(); return $("aguaUnidad").value === "l" ? +(v / 1000).toFixed(3) : v; }
+function aguaM3(){ var v = num($("agua").value); return $("aguaUnidad").value === "l" ? +(v / 1000).toFixed(3) : v; }
 function pintarAgua(){
-  var v = aguaM3(), h = $("hintAgua");
+  var v = num($("agua").value), h = $("hintAgua");
   if (!h) return;
   if (!$("agua").value){ h.textContent = ""; return; }
   h.textContent = $("aguaUnidad").value === "l"
