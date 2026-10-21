@@ -356,17 +356,17 @@ $("form").addEventListener("submit", async function(e){
   var equipo = marcados();
   if (PERSONAL.length && !equipo.length){ aviso("Marca quiénes trabajaron hoy en este servicio.", false); return; }
   try{ localStorage.setItem(KEY_EQ + g, JSON.stringify(equipo)); }catch(e){}
-  var id = slug(g) + "_" + f + "_" + slug(s.codigo || s.nombre);
-  var H = ["ID","Fecha","Grupo","Código servicio","Cliente","Proyecto","Ciudad","Hora llegada","Hora inicio","Hora fin","Paneles lavados","Paneles rotos","Agua m3","ACPM gl","Gasolina gl","Novedades","Integrantes","Total módulos instalación"];
+  var id = slug(g) + "_" + f + "_" + slug(s.sid || s.codigo || s.nombre);
+  var H = ["ID","Fecha","Grupo","Código servicio","Cliente","Proyecto","Ciudad","Hora llegada","Hora inicio","Hora fin","Paneles lavados","Paneles rotos","Agua m3","ACPM gl","Gasolina gl","Novedades","Integrantes","Total módulos instalación","ID servicio"];
   var fila = [id, f, g, s.codigo, s.cliente, s.proyecto, s.ciudad, $("llegada").value, $("inicio").value, $("fin").value,
-              num($("lavados").value), num($("rotos").value), aguaM3(), num($("acpm").value), num($("gasolina").value), $("novedades").value.trim(), equipo.join(", "), num($("acumulado").value)];
+              num($("lavados").value), num($("rotos").value), aguaM3(), num($("acpm").value), num($("gasolina").value), $("novedades").value.trim(), equipo.join(", "), num($("acumulado").value), s.sid || ""];
   var nombre = "Parte " + g + " " + f;
 
   if (FORM && !porWhats){
     var p = {v:1, clave:CLAVE_ACTUAL, id:id, fecha:f, grupo:g, codigo:s.codigo, cliente:s.cliente, proyecto:s.proyecto, ciudad:s.ciudad,
              llegada:$("llegada").value, inicio:$("inicio").value, fin:$("fin").value,
              lavados:num($("lavados").value), rotos:num($("rotos").value), agua:aguaM3(), acpm:num($("acpm").value),
-             gasolina:num($("gasolina").value), novedades:$("novedades").value.trim(), integrantes:equipo.join(", "), acumulado:num($("acumulado").value), enviado:new Date().toISOString()};
+             gasolina:num($("gasolina").value), novedades:$("novedades").value.trim(), integrantes:equipo.join(", "), acumulado:num($("acumulado").value), sid:s.sid || "", enviado:new Date().toISOString()};
     var dato;
     try{ dato = await cifrarParte(p); }
     catch(err){ aviso("Este celular no pudo preparar el parte. Usa 'Otra opción: enviar por WhatsApp'.", false); return; }
