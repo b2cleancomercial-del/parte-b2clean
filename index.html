@@ -152,9 +152,10 @@ function pintarAgua(){
     ? "= " + (v / 1000).toLocaleString("es-CO", {maximumFractionDigits:3}) + " m³"
     : "= " + (v * 1000).toLocaleString("es-CO", {maximumFractionDigits:0}) + " litros";
 }
-document.addEventListener("DOMContentLoaded", function(){
+function engancharAgua(){
   ["agua", "aguaUnidad"].forEach(function(i){ var el = document.getElementById(i); if (el){ el.addEventListener("input", pintarAgua); el.addEventListener("change", pintarAgua); } });
-});
+}
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", engancharAgua); else engancharAgua();
 function grp(n){ return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, "."); }
 function hoy(){ var d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
 function fTxt(f){ return f ? f.slice(8,10) + "/" + f.slice(5,7) : ""; }
