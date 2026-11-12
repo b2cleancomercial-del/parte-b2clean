@@ -118,6 +118,7 @@
 
     <button class="btn" type="submit">Enviar parte</button>
     <div class="msg" id="msg" hidden></div>
+    <button class="btn" type="button" id="btnCompWhats" hidden style="background:#25D366;color:#fff">Compartir resumen por WhatsApp</button>
     <div class="foot" id="otraOpcion" hidden><a href="#" id="btnWhats" style="color:inherit">Otra opción: enviar por WhatsApp</a></div>
   </form>
 
@@ -348,8 +349,37 @@ $("btnWhats").addEventListener("click", function(e){ e.preventDefault(); porWhat
 function aviso(t, ok){ var m = $("msg"); m.hidden = false; m.textContent = t; m.className = "msg " + (ok ? "ok" : "err"); m.scrollIntoView({behavior:"smooth", block:"center"}); }
 function serial(f){ var p = f.split("-"); return (Date.UTC(+p[0], +p[1]-1, +p[2]) - Date.UTC(1899, 11, 30)) / 86400000; }
 
+var textoWA = "";
+function h12(v){ var m = /^(\d{1,2}):(\d{2})/.exec(v || ""); if (!m) return ""; var h = +m[1]; return ((h % 12) || 12) + ":" + m[2] + (h < 12 ? " am" : " pm"); }
+function miles(n){ return Number(n || 0).toLocaleString("es-CO"); }
+function armarWhats(f, s){
+  var p = f.split("-"), L = [];
+  L.push(p[2] + "-" + p[1] + "-" + p[0].slice(2));
+  L.push("Proyecto " + (s.proyecto || s.nombre || ""));
+  L.push("REPORTE DIARIO");
+  if ($("llegada").value) L.push("HORA ENTRADA " + h12($("llegada").value));
+  if ($("inicio").value) L.push("HORA INICIO " + h12($("inicio").value));
+  if ($("fin").value) L.push("HORA FINAL " + h12($("fin").value));
+  L.push("PANELES LAVADOS DÍA: " + miles(ent($("lavados").value)));
+  L.push("TOTAL PANELES ROTOS: " + miles(ent($("rotos").value)));
+  L.push("CONSUMO AGUA: " + String(aguaM3()).replace(".", ",") + " m3");
+  L.push("CONSUMO ACPM " + String(num($("acpm").value)).replace(".", ",") + " Gl");
+  L.push("CONSUMO GASOLINA: " + String(num($("gasolina").value)).replace(".", ",") + " Gl");
+  if ($("acumulado").value){ L.push("MODULOS TOTAL LAVADOS INSTALACIÓN"); L.push(miles(ent($("acumulado").value))); }
+  var nv = $("novedades").value.trim();
+  L.push("NOVEDADES"); L.push(nv || "Sin novedad");
+  return L.join("\n");
+}
+function mostrarWhats(t){ textoWA = t; $("btnCompWhats").hidden = false; }
+$("btnCompWhats").addEventListener("click", function(){
+  if (!textoWA) return;
+  if (navigator.share){ navigator.share({text:textoWA}).catch(function(){}); }
+  else { window.open("https://wa.me/?text=" + encodeURIComponent(textoWA), "_blank"); }
+});
+$("form").addEventListener("input", function(){ $("btnCompWhats").hidden = true; });
 $("form").addEventListener("submit", async function(e){
   e.preventDefault();
+  $("btnCompWhats").hidden = true;
   var g = $("grupo").value, f = $("fecha").value, s = SERVICIOS[$("servicio").value];
   if (!g){ aviso("Falta escoger el grupo.", false); return; }
   if (!f){ aviso("Falta la fecha.", false); return; }
@@ -363,6 +393,7 @@ $("form").addEventListener("submit", async function(e){
   var fila = [id, f, g, s.codigo, s.cliente, s.proyecto, s.ciudad, $("llegada").value, $("inicio").value, $("fin").value,
               ent($("lavados").value), ent($("rotos").value), aguaM3(), num($("acpm").value), num($("gasolina").value), $("novedades").value.trim(), equipo.join(", "), ent($("acumulado").value), s.sid || ""];
   var nombre = "Parte " + g + " " + f;
+  var textoParaWA = armarWhats(f, s);
 
   if (FORM && !porWhats){
     var p = {v:1, clave:CLAVE_ACTUAL, id:id, fecha:f, grupo:g, codigo:s.codigo, cliente:s.cliente, proyecto:s.proyecto, ciudad:s.ciudad,
@@ -376,6 +407,7 @@ $("form").addEventListener("submit", async function(e){
     var r = await vaciarCola();
     if (!r.quedan) aviso("✓ Parte enviado a la oficina. Si corriges algo, vuelve a enviarlo: reemplaza el anterior.", true);
     else aviso("Sin señal: el parte quedó guardado en el celular y se envía solo cuando vuelva el internet (deja esta página abierta o ábrela de nuevo con señal).", true);
+    mostrarWhats(textoParaWA);
     return;
   }
   porWhats = false;
