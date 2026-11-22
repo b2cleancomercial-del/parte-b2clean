@@ -42,6 +42,20 @@
   .msg{ font-size:15px; font-weight:600; border-radius:10px; padding:10px 12px; }
   .msg.ok{ background:var(--good-soft); color:var(--good); }
   .msg.err{ background:var(--bad-soft); color:var(--bad); }
+  .rs-tot{ display:flex; gap:10px; flex-wrap:wrap; }
+  .rs-tot div{ flex:1 1 90px; background:var(--accent-soft); border-radius:10px; padding:8px 10px; text-align:center; }
+  .rs-tot b{ display:block; font-size:20px; color:var(--accent); }
+  .rs-tot span{ font-size:12.5px; color:var(--ink-soft); }
+  .rs-fila{ display:grid; grid-template-columns:auto 1fr auto; gap:2px 10px; padding:7px 0; border-bottom:1px solid var(--line); font-size:14.5px; align-items:baseline; }
+  .rs-fila:last-child{ border-bottom:0; }
+  .rs-fila .d{ font-weight:700; white-space:nowrap; }
+  .rs-fila .n{ text-align:right; font-weight:700; white-space:nowrap; }
+  .rs-fila .e{ grid-column:2 / 4; font-size:12.5px; color:var(--ink-soft); }
+  .rs-fila .e.ok{ color:var(--good); }
+  .rs-sin{ background:var(--bad-soft); color:var(--bad); border-radius:10px; padding:9px 12px; font-size:14.5px; font-weight:600; }
+  .rs-srv{ font-size:14px; padding:4px 0; }
+  .rs-barra{ height:6px; background:var(--line); border-radius:3px; margin-top:3px; overflow:hidden; }
+  .rs-barra i{ display:block; height:100%; background:var(--green); }
   .chips{ display:flex; flex-wrap:wrap; gap:8px; }
   .chip{ display:inline-flex; align-items:center; gap:7px; background:var(--kraft); border:1px solid var(--line); border-radius:999px; padding:8px 13px; font-size:15px; cursor:pointer; user-select:none; text-transform:none; letter-spacing:0; color:var(--ink); font-weight:500; margin:0; }
   .chip input{ width:18px; height:18px; margin:0; padding:0; accent-color:var(--accent); }
@@ -121,6 +135,8 @@
     <button class="btn" type="button" id="btnCompWhats" hidden style="background:#25D366;color:#fff">Compartir resumen por WhatsApp</button>
     <div class="foot" id="otraOpcion" hidden><a href="#" id="btnWhats" style="color:inherit">Otra opción: enviar por WhatsApp</a></div>
   </form>
+
+  <div class="card" id="resumen" hidden></div>
 
   <div class="foot" id="foot"></div>
   <div class="foot" id="salir" hidden><a href="#" id="btnSalir" style="color:inherit">Cambiar de clave</a></div>
@@ -284,8 +300,36 @@ async function iniciar(enc){
   catch(e){ pedirClave("La clave cambió. Pídele la nueva a la oficina."); }
 }
 
+var DIAS_SEM = ["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
+function diaTxt(f){ var p = f.split("-"); var d = new Date(+p[0], +p[1]-1, +p[2]); return DIAS_SEM[d.getDay()] + " " + f.slice(8,10) + "/" + f.slice(5,7); }
+function pintarResumen(r){
+  var box = $("resumen");
+  try{
+    if (!r || !r.rep){ box.hidden = true; return; }
+    var h = '<div class="sec">Mi resumen · últimos ' + (r.dias || 15) + ' días</div>';
+    var dias = {}; r.rep.forEach(function(x){ dias[x.f] = 1; });
+    h += '<div class="rs-tot"><div><b>' + grp(r.tot || 0) + '</b><span>paneles lavados</span></div><div><b>' + Object.keys(dias).length + '</b><span>días con reporte</span></div><div><b>' + (r.sin || []).length + '</b><span>días sin reporte</span></div></div>';
+    if ((r.sin || []).length) h += '<div class="rs-sin">Sin reporte: ' + r.sin.map(diaTxt).map(esc).join(" · ") + '. Si trabajaron esos días, envíen el parte; si no, avísenle a la oficina.</div>';
+    else h += '<div class="msg ok">Al día: no hay días sin reporte.</div>';
+    if (r.srv && r.srv.length){
+      h += '<div class="sec">Por servicio</div>';
+      r.srv.forEach(function(s){
+        var pct = (s.p && s.a != null) ? Math.min(100, Math.round(100 * s.a / s.p)) : null;
+        h += '<div class="rs-srv"><b>' + esc(s.s) + '</b> · ' + grp(s.l) + ' en estos días' + (s.p && s.a != null ? ' · lleva ' + grp(s.a) + ' de ' + grp(s.p) + ' (' + pct + '%)' : '') +
+             (pct != null ? '<div class="rs-barra"><i style="width:' + pct + '%"></i></div>' : '') + '</div>';
+      });
+    }
+    h += '<div class="sec">Día por día</div>';
+    r.rep.forEach(function(x){
+      h += '<div class="rs-fila"><span class="d">' + esc(diaTxt(x.f)) + '</span><span>' + esc(x.s) + '</span><span class="n">' + grp(x.l) + '</span>' +
+           '<span class="e' + (x.v ? ' ok' : '') + '">' + (x.v ? '✓ aprobado por la oficina' : 'en revisión de la oficina') + (x.r ? ' · ' + x.r + ' rotos' : '') + '</span></div>';
+    });
+    box.innerHTML = h; box.hidden = false;
+  }catch(e){ box.hidden = true; }
+}
 function usarLista(d, guardada){
   SERVICIOS = d.servicios || []; GENERADO = d.generado || ""; PERSONAL = d.personal || [];
+  pintarResumen(d.resumen);
   $("foot").textContent = "Lista de servicios del Panel de Control al " + GENERADO + (guardada ? " (sin señal: última lista guardada)." : ".");
   llenarServicios();
 }
